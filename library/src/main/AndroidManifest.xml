@@ -1,0 +1,22 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.awareframework.android.sensor.connectivity">
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application>
+        <service
+            android:name=".ConnectivitySensor"
+            android:exported="true" />
+
+        <receiver
+            android:name=".ConnectivitySensor$ConnectivitySensorBroadcastReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.aware.android.sensor.connectivity.SENSOR_START" />
+                <action android:name="com.aware.android.sensor.connectivity.SENSOR_STOP" />
+                <action android:name="com.aware.android.sensor.SENSOR_START" />
+                <action android:name="com.aware.android.sensor.SENSOR_STOP" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
