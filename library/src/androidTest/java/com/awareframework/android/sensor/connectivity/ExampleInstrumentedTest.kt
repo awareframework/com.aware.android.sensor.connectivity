@@ -2,8 +2,6 @@ package com.awareframework.android.sensor.connectivity
 
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
-import android.connectivity.CellLocation
-import android.connectivity.SignalStrength
 import com.awareframework.android.core.db.Engine
 import org.junit.Test
 import org.junit.runner.RunWith
