@@ -3,6 +3,7 @@ package com.awareframework.android.sensor.connectivity
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import com.awareframework.android.core.db.Engine
+import com.awareframework.android.sensor.connectivity.model.TrafficData
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -76,6 +77,17 @@ class ExampleInstrumentedTest {
                     // your code here...
                 }
 
+                override fun onNetworkTraffic(data: TrafficData) {
+                    // your code here...
+                }
+
+                override fun onWiFiTraffic(data: TrafficData) {
+                    // your code here...
+                }
+
+                override fun onIdleTraffic() {
+                    // your code here...
+                }
             }
             dbType = Engine.DatabaseType.ROOM
             debug = true

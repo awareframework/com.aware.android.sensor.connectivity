@@ -72,6 +72,23 @@ Contains the connectivity data.
 | timezone  | Int    | [Raw timezone offset][1] of the device                                                              |
 | os        | String | Operating system of the device (ex. android)                                                        |
 
+### Traffic Data
+
+Contains the Wi-Fi and mobile data traffic, in bytes and packets.
+
+| Field           | Type   | Description                                                     |
+| --------------- | ------ | --------------------------------------------------------------- |
+| type            | Int    | the network type, one of the following: `1=WIFi, 4=MOBILE`      |
+| receivedBytes   | Long   | received bytes                                                  |
+| sentBytes       | Long   | sent bytes                                                      |
+| receivedPackets | Long   | received packets                                                |
+| sentPackets     | Long   | sent packets                                                    |
+| deviceId        | String | AWARE device UUID                                               |
+| label           | String | Customizable label. Useful for data calibration or traceability |
+| timestamp       | Long   | unixtime milliseconds since 1970                                |
+| timezone        | Int    | [Raw timezone offset][1] of the device                          |
+| os              | String | Operating system of the device (ex. android)                    |
+
 ## Example usage
 
 ```kotlin
@@ -134,6 +151,17 @@ ConnectivitySensor.start(appContext, ConnectivitySensor.Config().apply {
             // your code here...
         }
 
+        override fun onNetworkTraffic(data: TrafficData) {
+            // your code here...
+        }
+
+        override fun onWiFiTraffic(data: TrafficData) {
+            // your code here...
+        }
+
+        override fun onIdleTraffic() {
+            // your code here...
+        }
     }
     dbType = Engine.DatabaseType.ROOM
     debug = true

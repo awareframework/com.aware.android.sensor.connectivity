@@ -1,7 +1,6 @@
 package com.awareframework.android.sensor.connectivity
 
 import android.Manifest.permission.ACCESS_NETWORK_STATE
-import android.Manifest.permission.READ_PHONE_STATE
 import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -11,7 +10,9 @@ import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkInfo
+import android.net.TrafficStats
 import android.net.wifi.WifiManager
+import android.os.Handler
 import android.os.IBinder
 import android.support.v4.content.ContextCompat
 import android.telephony.PhoneStateListener
@@ -22,6 +23,8 @@ import android.util.Log
 import com.awareframework.android.core.AwareSensor
 import com.awareframework.android.core.model.SensorConfig
 import com.awareframework.android.sensor.connectivity.model.ConnectivityData
+import com.awareframework.android.sensor.connectivity.model.TrafficData
+
 
 /**
  * Connectivity context
@@ -67,72 +70,72 @@ class ConnectivitySensor : AwareSensor() {
         const val NETWORK_TYPE_WIMAX = 5
 
         /**
-         * Broadcasted event: airplane is active
+         * Fired event: airplane is active
          */
         const val ACTION_AWARE_AIRPLANE_ON = "ACTION_AWARE_AIRPLANE_ON"
 
         /**
-         * Broadcasted event: airplane is inactive
+         * Fired event: airplane is inactive
          */
         const val ACTION_AWARE_AIRPLANE_OFF = "ACTION_AWARE_AIRPLANE_OFF"
 
         /**
-         * Broadcasted event: wifi is active
+         * Fired event: wifi is active
          */
         const val ACTION_AWARE_WIFI_ON = "ACTION_AWARE_WIFI_ON"
 
         /**
-         * Broadcasted event: wifi is inactive
+         * Fired event: wifi is inactive
          */
         const val ACTION_AWARE_WIFI_OFF = "ACTION_AWARE_WIFI_OFF"
 
         /**
-         * Broadcasted event: mobile is active
+         * Fired event: mobile is active
          */
         const val ACTION_AWARE_MOBILE_ON = "ACTION_AWARE_MOBILE_ON"
 
         /**
-         * Broadcasted event: mobile is inactive
+         * Fired event: mobile is inactive
          */
         const val ACTION_AWARE_MOBILE_OFF = "ACTION_AWARE_MOBILE_OFF"
 
         /**
-         * Broadcasted event: wimax is active
+         * Fired event: wimax is active
          */
         const val ACTION_AWARE_WIMAX_ON = "ACTION_AWARE_WIMAX_ON"
 
         /**
-         * Broadcasted event: wimax is inactive
+         * Fired event: wimax is inactive
          */
         const val ACTION_AWARE_WIMAX_OFF = "ACTION_AWARE_WIMAX_OFF"
 
         /**
-         * Broadcasted event: bluetooth is active
+         * Fired event: bluetooth is active
          */
         const val ACTION_AWARE_BLUETOOTH_ON = "ACTION_AWARE_BLUETOOTH_ON"
 
         /**
-         * Broadcasted event: bluetooth is inactive
+         * Fired event: bluetooth is inactive
          */
         const val ACTION_AWARE_BLUETOOTH_OFF = "ACTION_AWARE_BLUETOOTH_OFF"
 
         /**
-         * Broadcasted event: GPS is active
+         * Fired event: GPS is active
          */
         const val ACTION_AWARE_GPS_ON = "ACTION_AWARE_GPS_ON"
 
         /**
-         * Broadcasted event: GPS is inactive
+         * Fired event: GPS is inactive
          */
         const val ACTION_AWARE_GPS_OFF = "ACTION_AWARE_GPS_OFF"
 
         /**
-         * Broadcasted event: internet access is available
+         * Fired event: internet access is available
          */
         const val ACTION_AWARE_INTERNET_AVAILABLE = "ACTION_AWARE_INTERNET_AVAILABLE"
 
         /**
-         * Broadcasted event: internet access is unavailable
+         * Fired event: internet access is unavailable
          */
         const val ACTION_AWARE_INTERNET_UNAVAILABLE = "ACTION_AWARE_INTERNET_UNAVAILABLE"
 
@@ -151,6 +154,11 @@ class ConnectivitySensor : AwareSensor() {
          * String "internet_access"
          */
         const val EXTRA_ACCESS = "internet_access"
+
+        /**
+         * Fired event: updated traffic information is available
+         */
+        const val ACTION_AWARE_NETWORK_TRAFFIC = "ACTION_AWARE_NETWORK_TRAFFIC"
 
         const val ACTION_AWARE_CONNECTIVITY_START = "com.awareframework.android.sensor.connectivity.SENSOR_START"
         const val ACTION_AWARE_CONNECTIVITY_STOP = "com.awareframework.android.sensor.connectivity.SENSOR_STOP"
@@ -365,6 +373,120 @@ class ConnectivitySensor : AwareSensor() {
         }
     }
 
+    /** TRAFFIC START **/
+    data class TrafficUsage(
+            var rxBytes: Long = 0L,
+            var rxPackets: Long = 0L,
+            var txBytes: Long = 0L,
+            var txPackets: Long = 0L
+    ) {
+
+        operator fun plus(b: TrafficUsage): TrafficUsage {
+            return TrafficUsage(
+                    rxBytes + b.rxBytes,
+                    rxPackets + b.rxPackets,
+                    txBytes + b.txBytes,
+                    txPackets + b.txPackets
+            )
+        }
+
+        operator fun minus(b: TrafficUsage): TrafficUsage {
+            return TrafficUsage(
+                    rxBytes - b.rxBytes,
+                    rxPackets - b.rxPackets,
+                    txBytes - b.txBytes,
+                    txPackets - b.txPackets
+            )
+        }
+    }
+
+    //All stats
+    private var startTotalUsage = TrafficUsage()
+
+    //Mobile stats
+    private var mobileUsage = TrafficUsage()
+
+    //WiFi stats
+    private var wifiUsage = TrafficUsage()
+
+    private val trafficHandler = Handler()
+    private val trafficRunnable = Runnable {
+        val currentMobileUsage = TrafficUsage(
+                TrafficStats.getMobileRxBytes(),
+                TrafficStats.getMobileRxPackets(),
+                TrafficStats.getMobileTxBytes(),
+                TrafficStats.getMobileTxPackets()
+        )
+
+        val currentWifiUsage = TrafficUsage(
+                TrafficStats.getTotalRxBytes() - TrafficStats.getMobileRxBytes(),
+                TrafficStats.getTotalRxPackets() - TrafficStats.getMobileRxPackets(),
+                TrafficStats.getTotalTxBytes() - TrafficStats.getMobileTxBytes(),
+                TrafficStats.getTotalTxPackets() - TrafficStats.getMobileTxPackets()
+        )
+
+        val deltaMobile = currentMobileUsage - mobileUsage
+        val deltaWifi = currentWifiUsage - wifiUsage
+
+        val wifiData = TrafficData().apply {
+            timestamp = System.currentTimeMillis()
+            deviceId = CONFIG.deviceId
+            label = CONFIG.label
+
+            type = NETWORK_TYPE_WIFI
+
+            receivedBytes = deltaWifi.rxBytes
+            receivedPackets = deltaWifi.rxPackets
+            sentBytes = deltaWifi.txBytes
+            sentPackets = deltaWifi.txPackets
+        }
+        dbEngine?.save(wifiData, TrafficData.TABLE_NAME)
+
+        CONFIG.sensorObserver?.onWiFiTraffic(wifiData)
+        logd("Wifi traffic: $wifiData")
+
+        val mobileData = TrafficData().apply {
+            timestamp = System.currentTimeMillis()
+            deviceId = CONFIG.deviceId
+            label = CONFIG.label
+
+            type = NETWORK_TYPE_MOBILE
+
+            receivedBytes = deltaMobile.rxBytes
+            receivedPackets = deltaMobile.rxPackets
+            sentBytes = deltaMobile.txBytes
+            sentPackets = deltaMobile.txPackets
+        }
+        dbEngine?.save(mobileData, TrafficData.TABLE_NAME)
+
+        CONFIG.sensorObserver?.onNetworkTraffic(mobileData)
+        logd("Network traffic: $mobileData")
+
+        sendBroadcast(Intent(ACTION_AWARE_NETWORK_TRAFFIC))
+
+        //refresh old values
+        //mobile
+        mobileUsage = currentMobileUsage
+        //wifi
+        wifiUsage = currentWifiUsage
+    }
+
+    private val networkTrafficObserver = object : PhoneStateListener() {
+        override fun onDataActivity(direction: Int) {
+            super.onDataActivity(direction)
+
+            when (direction) {
+                TelephonyManager.DATA_ACTIVITY_IN,
+                TelephonyManager.DATA_ACTIVITY_OUT,
+                TelephonyManager.DATA_ACTIVITY_INOUT -> trafficHandler.post(trafficRunnable)
+
+                TelephonyManager.DATA_ACTIVITY_NONE -> CONFIG.sensorObserver?.onIdleTraffic()
+            }
+        }
+    }
+
+    /** TRAFFIC END **/
+
     override fun onCreate() {
         super.onCreate()
 
@@ -389,6 +511,13 @@ class ConnectivitySensor : AwareSensor() {
             addAction(ACTION_AWARE_CONNECTIVITY_SYNC)
         })
 
+        startTotalUsage = TrafficUsage(
+                TrafficStats.getTotalRxBytes(),
+                TrafficStats.getTotalRxPackets(),
+                TrafficStats.getTotalTxBytes(),
+                TrafficStats.getTotalTxPackets()
+        )
+
         logd("Connectivity service created!")
     }
 
@@ -398,6 +527,27 @@ class ConnectivitySensor : AwareSensor() {
         if (REQUIRED_PERMISSIONS.any { ContextCompat.checkSelfPermission(this, it) != PERMISSION_GRANTED }) {
             logw("Missing permissions detected.")
             return START_NOT_STICKY
+        }
+
+        if (startTotalUsage.rxBytes == TrafficStats.UNSUPPORTED.toLong()) {
+            logw("Device doesn't support traffic statistics!")
+        } else {
+            if (mobileUsage == TrafficUsage()) {
+                mobileUsage = TrafficUsage(
+                        TrafficStats.getMobileRxBytes(),
+                        TrafficStats.getMobileRxPackets(),
+                        TrafficStats.getMobileTxBytes(),
+                        TrafficStats.getMobileTxPackets()
+                )
+            }
+
+            if (wifiUsage == TrafficUsage()) {
+                wifiUsage = startTotalUsage - mobileUsage
+            }
+
+            teleManager?.listen(networkTrafficObserver, PhoneStateListener.LISTEN_DATA_ACTIVITY)
+
+            logd("Traffic listening is active.")
         }
 
         logd("Connectivity service is active.")
@@ -410,6 +560,7 @@ class ConnectivitySensor : AwareSensor() {
 
         unregisterReceiver(networkMonitor)
         teleManager?.listen(phoneListener, PhoneStateListener.LISTEN_NONE)
+        teleManager?.listen(networkTrafficObserver, PhoneStateListener.LISTEN_NONE);
 
         dbEngine?.close()
 
@@ -418,6 +569,7 @@ class ConnectivitySensor : AwareSensor() {
 
     override fun onSync(intent: Intent?) {
         dbEngine?.startSync(ConnectivityData.TABLE_NAME)
+        dbEngine?.startSync(TrafficData.TABLE_NAME)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -450,6 +602,10 @@ class ConnectivitySensor : AwareSensor() {
         fun onWiFiOFF()
         fun onAirplaneON()
         fun onAirplaneOFF()
+
+        fun onNetworkTraffic(data: TrafficData)
+        fun onWiFiTraffic(data: TrafficData)
+        fun onIdleTraffic()
     }
 
     class ConnectivitySensorBroadcastReceiver : AwareSensor.SensorBroadcastReceiver() {
