@@ -559,8 +559,10 @@ class ConnectivitySensor : AwareSensor() {
         super.onDestroy()
 
         unregisterReceiver(networkMonitor)
+        unregisterReceiver(connectivityMonitor)
+
         teleManager?.listen(phoneListener, PhoneStateListener.LISTEN_NONE)
-        teleManager?.listen(networkTrafficObserver, PhoneStateListener.LISTEN_NONE);
+        teleManager?.listen(networkTrafficObserver, PhoneStateListener.LISTEN_NONE)
 
         dbEngine?.close()
 
